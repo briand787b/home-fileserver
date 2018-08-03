@@ -43,9 +43,9 @@ func (sfs *serverFileStore) Save(s *Server) error {
 }
 
 func (sfs *serverFileStore) GetAllServers() (Servers, error) {
-	if s.Servers {
+	// if s.Servers {
 
-	}
+	// }
 
 	return s.Servers
 }
