@@ -4,5 +4,6 @@ package app
 // of the persistence layer for the servers
 type ServerStore interface {
 	Save(*Server) error
-	RetrieveServerByName(string) (*Server, error)
+	GetAllServers() ([]Server, error)
+	GetServerByName(string) (*Server, error)
 }

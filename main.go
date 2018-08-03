@@ -14,7 +14,9 @@
 
 package main
 
-import "github.com/briand787b/hfs/cmd"
+import (
+	"github.com/briand787b/home-fileserver/cmd"
+)
 
 func main() {
 	cmd.Execute()

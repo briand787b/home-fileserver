@@ -18,7 +18,3 @@ func NewServer(name, ip, dir string) *Server {
 		WorkingDir: dir,
 	}
 }
-
-// Servers represents the set of known servers
-// on which the hfs binary is installed
-type Servers map[string]*Server
