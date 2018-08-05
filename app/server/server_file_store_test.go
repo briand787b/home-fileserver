@@ -206,25 +206,44 @@ func TestGetAllServers(t *testing.T) {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
-	t.Log("number of servers upon initialization: ", len(fs))
+	exp := fileStore{
+		validTestServer1.Name: validTestServer1,
+		validTestServer2.Name: validTestServer2,
+	}
 
-	for i, s := range []*Server{
-		validTestServer1,
-		validTestServer2,
-	} {
+	t.Log("number of servers upon initialization: ", len(fs))
+	var count int
+	for _, s := range exp {
+		count++
+		t.Log("iteration #", count)
+
 		if err := fs.add(s, n); err != nil {
-			t.Fatalf("could not save server #%v", i)
+			t.Fatalf("could not save server #%v", *s)
 		}
 
 		ss := fs.GetAllServers()
-		if len(ss) != i+1 {
-			t.Log("iteration #", i)
+
+		// ensure that # of servers matches call count to fs.add
+		if len(ss) != count {
 			t.Log("length of file store: ", len(ss))
-			t.Fatalf("number of servers should equal %v, is %v", i+1, len(ss))
+			t.Fatalf("number of servers should equal %v, is %v", count, len(ss))
 		}
-		if !reflect.DeepEqual(*s, *ss[i]) {
+
+		// ensure the recently saved server can be found in return list
+		var act *Server
+		for _, sRet := range ss {
+			if sRet.Name == s.Name {
+				act = sRet
+			}
+		}
+
+		if act == nil {
+			t.Fatal("could not find recently saved Server from GetAllServers")
+		}
+
+		if !reflect.DeepEqual(*act, *s) {
 			t.Logf("saved server: %+v\n", *s)
-			t.Logf("retrieved server: %+v\n", *ss[i])
+			t.Logf("retrieved server: %+v\n", *act)
 			t.Fatal("saved server is not equal to retrieved server")
 		}
 	}
