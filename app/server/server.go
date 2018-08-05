@@ -11,24 +11,28 @@ type Server struct {
 	Name       string   `json:"name"`
 	IP         string   `json:"ip_addr"`
 	WorkingDir string   `json:"working_dir"` // absolute path
-	FileList   []string `json:"-"`
+	FileList   []string `json:"file_list"`
+	Local      bool     `json:"local"`
 }
 
 // NewServer instantiates a new server.
 // It does NOT save it to the persistent
 // storage
-func NewServer(name, ip, dir string) *Server {
+func NewServer(name, ip string) *Server {
 	return &Server{
-		Name:       name,
-		IP:         ip,
-		WorkingDir: dir,
+		Name: name,
+		IP:   ip,
 	}
 }
 
-// func (s *Server) MarshalJSON() ([]byte, error) {
-// 	return
-// }
+func NewLocalServer(dir string) *Server {
+	// get files in dir
 
-// func (s *Server) String() string {
+	// get host ip
 
-// }
+	// get name from host
+
+	// set local to true
+
+	return nil
+}
