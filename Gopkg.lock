@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  branch = "master"
+  digest = "1:9a760d86bb81eaf7b8c4fe62ffc156c697c79a0d4bc59bacb3f893d34043cd3b"
+  name = "github.com/briand787b/home-fileserver"
+  packages = ["cmd"]
+  pruneopts = "UT"
+  revision = "1b7899d5d55e5faa6a3d8ea0fc124787870912e1"
+
+[[projects]]
   digest = "1:abeb38ade3f32a92943e5be54f55ed6d6e3b6602761d74b4aab4c9dd45c18abd"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
@@ -162,6 +170,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/briand787b/home-fileserver/cmd",
     "github.com/mitchellh/go-homedir",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",
