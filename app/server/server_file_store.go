@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 
@@ -25,9 +26,9 @@ var (
 // be opened when actively reading or writing.
 // Since reads/writes only happen when things
 // change, and the server configs should change
-// infrequently, every time that file is opened
-// it will be closed within the same invocation
-// in which it is opened
+// infrequently, every function invocation that
+// opens the file will be close will close it
+// upon exiting
 type fileStore map[string]*Server
 
 // NewFileStore sets up and returns a new
@@ -39,13 +40,13 @@ func NewFileStore() (Store, error) {
 // newFileStore exists to facilitate testing of the
 // fileStore struct
 func newFileStore(path string) (fileStore, error) {
-	fss := fileStore{}
-	return fss, fss.getState(path)
+	fs := fileStore{}
+	return fs, fs.getState(path)
 }
 
-// saveState adds the current state of fss to disk
-func (fss fileStore) saveState(filename string) error {
-	fd, err := os.OpenFile(filename, os.O_RDWR, 0600)
+// saveState adds the current state of sfs to disk
+func (fs fileStore) saveState(filename string) error {
+	fd, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return errors.Wrap(err,
 			"could not open file for file store",
@@ -58,16 +59,16 @@ func (fss fileStore) saveState(filename string) error {
 			"cannot truncate server store file")
 	}
 
-	if err := json.NewEncoder(fd).Encode(&fss); err != nil {
+	if err := json.NewEncoder(fd).Encode(&fs); err != nil {
 		return errors.Wrap(err,
-			"could not encode fss into file as JSON",
+			"could not encode fs into file as JSON",
 		)
 	}
 
 	return nil
 }
 
-func (fss fileStore) getState(path string) error {
+func (fs fileStore) getState(path string) error {
 	fd, err := os.OpenFile(
 		path,
 		os.O_CREATE|os.O_RDWR,
@@ -86,12 +87,13 @@ func (fss fileStore) getState(path string) error {
 	}
 
 	if fStat.Size() == 0 {
-		// file is empty, fss should be empty too
-		fss = fileStore{}
+		// file is empty, fs should be empty too
+		fmt.Println("opened empty file, returning empty store")
+		fs = fileStore{}
 		return nil
 	}
 
-	if err := json.NewDecoder(fd).Decode(&fss); err != nil {
+	if err := json.NewDecoder(fd).Decode(&fs); err != nil {
 		return errors.Wrap(err,
 			"could not decode json in file to fileStore")
 	}
@@ -100,11 +102,11 @@ func (fss fileStore) getState(path string) error {
 }
 
 // Add adds a server and saves it to persistent storage
-func (fss fileStore) AddServer(s *Server) error {
-	return fss.add(s, serversPath)
+func (fs fileStore) AddServer(s *Server) error {
+	return fs.add(s, serversPath)
 }
 
-func (fss fileStore) add(s *Server, path string) error {
+func (fs fileStore) add(s *Server, path string) error {
 	if s.Name == "" {
 		return errors.New("Server must have name")
 	}
@@ -117,29 +119,29 @@ func (fss fileStore) add(s *Server, path string) error {
 		return errors.New("WorkingDir cannot be empty")
 	}
 
-	fss[s.Name] = s
-	return fss.saveState(path)
+	fs[s.Name] = s
+	return fs.saveState(path)
 }
 
-func (fss fileStore) RemoveServer(name string) error {
-	return fss.removeServer(name, serversPath)
+func (fs fileStore) RemoveServer(name string) error {
+	return fs.removeServer(name, serversPath)
 }
 
-func (fss fileStore) removeServer(name, path string) error {
-	delete(fss, name)
-	return fss.saveState(path)
+func (fs fileStore) removeServer(name, path string) error {
+	delete(fs, name)
+	return fs.saveState(path)
 }
 
-func (fss fileStore) GetAllServers() (ss []*Server) {
-	for _, s := range fss {
+func (fs fileStore) GetAllServers() (ss []*Server) {
+	for _, s := range fs {
 		ss = append(ss, s)
 	}
 
 	return
 }
 
-func (fss fileStore) GetServerByName(name string) (*Server, error) {
-	s, ok := fss[name]
+func (fs fileStore) GetServerByName(name string) (*Server, error) {
+	s, ok := fs[name]
 	if ok {
 		return s, nil
 	}

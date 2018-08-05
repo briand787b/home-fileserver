@@ -2,21 +2,19 @@ package server
 
 import (
 	"bytes"
-	"fmt"
+	"flag"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 )
 
-const (
-	fakeServerPath = "this_file_does_not_exist.json"
-	testServerName = "test_server"
-	testServerIP   = "127.0.0.1"
+var (
+	validTestServer1 *Server
+	validTestServer2 *Server
 )
 
-var (
-	validTestServer *Server
-)
+var update = flag.Bool("update", false, "update .golden files")
 
 func TestMain(m *testing.M) {
 	setupFS()
@@ -25,62 +23,33 @@ func TestMain(m *testing.M) {
 	os.Exit(exitStatus)
 }
 
-// prepares for running fileStore tests
-func setupFS() {
-	pwd, err := os.Getwd()
-	if err != nil {
-		fmt.Println("cannot get working dir: ", err)
-		os.Exit(1)
-	}
-
-	validTestServer = &Server{
-		Name:       testServerName,
-		IP:         testServerIP,
-		WorkingDir: pwd,
-	}
-
-	removeTestFiles()
-}
-
-// cleans up after running fileStore tests
-func tearDownFS() {
-	removeTestFiles()
-}
-
-// removes test-only files
-func removeTestFiles() {
-	if _, err := os.Stat(fakeServerPath); err == nil {
-		if err := os.Remove(fakeServerPath); err != nil {
-			fmt.Printf("cannot remove %s: %s", fakeServerPath, err)
-			os.Exit(1)
-		}
-	}
-}
-
 // Verify that no error is generated when
 // instantiating new file-based server store
 func TestGetNewFileStore(t *testing.T) {
-	if _, err := newFileStore(fakeServerPath); err != nil {
+	n := getTestFileStoreName(t)
+	if _, err := newFileStore(n); err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 }
 
 func TestFileStoreSaveFailsNoName(t *testing.T) {
-	fss, err := newFileStore(fakeServerPath)
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
-	if err := fss.add(&Server{
+	if err := fs.add(&Server{
 		IP:         "0.0.0.0",
 		WorkingDir: "/valid/path",
-	}, fakeServerPath); err == nil {
+	}, t.Name()); err == nil {
 		t.Fatal("should not be able to save server with no name")
 	}
 }
 
 func TestFileStoreSaveFailsBadIPv4(t *testing.T) {
-	fss, err := newFileStore(fakeServerPath)
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
@@ -94,47 +63,53 @@ func TestFileStoreSaveFailsBadIPv4(t *testing.T) {
 	}
 
 	for _, ip := range badIPs {
-		if err := fss.add(&Server{
+		if err := fs.add(&Server{
 			Name:       testServerName,
 			IP:         ip[0],
 			WorkingDir: "/valid",
-		}, fakeServerPath); err == nil {
+		}, t.Name()); err == nil {
 			t.Fatal("should not be able to save because: ", ip[1])
 		}
 	}
 }
 
 func TestFileStoreSaveFailsNoWorkingDir(t *testing.T) {
-	fss, err := newFileStore(fakeServerPath)
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
-	if err := fss.add(&Server{
+	if err := fs.add(&Server{
 		IP:   "0.0.0.0",
 		Name: "ValidName",
-	}, fakeServerPath); err == nil {
+	}, n); err == nil {
 		t.Fatal("should not be able to save server with no working dir")
 	}
 }
 
 func TestFileStoreAddServerFromCleanState(t *testing.T) {
-	fss, err := newFileStore(fakeServerPath)
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
-	if err := fss.add(validTestServer, fakeServerPath); err != nil {
-		t.Fatal("could not save single validTestServer")
+	if err := fs.add(validTestServer1, n); err != nil {
+		t.Fatal("could not save single validTestServer1: ", err)
 	}
 
-	actual, err := ioutil.ReadFile(fakeServerPath)
+	actual, err := ioutil.ReadFile(n)
 	if err != nil {
 		t.Fatal("could not open written JSON file: ", err)
 	}
 
 	tActual := cutWhiteSpace(actual, t)
 	t.Logf("tActual: %v\n", string(tActual))
+
+	if *update {
+		overwriteGoldenFile(t, tActual)
+	}
 
 	goldenFile := parseGoldenFile(t).Bytes()
 
@@ -145,32 +120,76 @@ func TestFileStoreAddServerFromCleanState(t *testing.T) {
 }
 
 func TestFileStoreAddSecondServer(t *testing.T) {
-	fss, err := newFileStore(fakeServerPath)
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
 	// first add, starts at 0
-	if err := fss.add(validTestServer, fakeServerPath); err != nil {
-		t.Fatal("could not save single validTestServer")
+	if err := fs.add(validTestServer1, n); err != nil {
+		t.Fatal("could not save single validTestServer1")
 	}
 
 	// second add, starts at 1
-	if err := fss.add(&Server{
-		Name:       testServerName + "1",
-		IP:         "127.0.0.2",
-		WorkingDir: "working_dir",
-	}, fakeServerPath); err != nil {
-		t.Fatal("could not save single validTestServer")
+	if err := fs.add(validTestServer2, n); err != nil {
+		t.Fatal("could not save single validTestServer1")
 	}
 
-	actual, err := ioutil.ReadFile(fakeServerPath)
+	actual, err := ioutil.ReadFile(n)
 	if err != nil {
 		t.Fatal("could not open written JSON file: ", err)
 	}
 
 	tActual := cutWhiteSpace(actual, t)
 	t.Logf("tActual: %v\n", string(tActual))
+
+	if *update {
+		overwriteGoldenFile(t, tActual)
+	}
+
+	goldenFile := parseGoldenFile(t).Bytes()
+
+	// validate saved JSON is correct
+	if bytes.Compare(goldenFile, tActual) != 0 {
+		// t.Logf("actual: %v\n", actual)
+		// t.Logf("expected: %v\n", goldenFile)
+		t.Fatal("written JSON file does not match golden file")
+	}
+}
+
+func TestFileStoreRemoveFirstServer(t *testing.T) {
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
+	if err != nil {
+		t.Fatal("unable to instantiate new file server store: ", err)
+	}
+
+	// first add, starts at 0
+	if err := fs.add(validTestServer1, n); err != nil {
+		t.Fatal("could not save single validTestServer1")
+	}
+
+	// second add, starts at 1
+	if err := fs.add(validTestServer2, n); err != nil {
+		t.Fatal("could not save single validTestServer1")
+	}
+
+	if err := fs.removeServer(validTestServer1.Name, n); err != nil {
+		t.Fatal("could not remove first server: ", err)
+	}
+
+	actual, err := ioutil.ReadFile(n)
+	if err != nil {
+		t.Fatal("could not open written JSON file: ", err)
+	}
+
+	tActual := cutWhiteSpace(actual, t)
+	t.Logf("tActual: %v\n", string(tActual))
+
+	if *update {
+		overwriteGoldenFile(t, tActual)
+	}
 
 	goldenFile := parseGoldenFile(t).Bytes()
 
@@ -180,42 +199,66 @@ func TestFileStoreAddSecondServer(t *testing.T) {
 	}
 }
 
-func TestFileStoreRemoveFirstServer(t *testing.T) {
-	fss, err := newFileStore(fakeServerPath)
+func TestGetAllServers(t *testing.T) {
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
 		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
-	// first add, starts at 0
-	if err := fss.add(validTestServer, fakeServerPath); err != nil {
-		t.Fatal("could not save single validTestServer")
-	}
+	t.Log("number of servers upon initialization: ", len(fs))
 
-	// second add, starts at 1
-	if err := fss.add(&Server{
-		Name:       testServerName + "1",
-		IP:         "127.0.0.2",
-		WorkingDir: "working_dir",
-	}, fakeServerPath); err != nil {
-		t.Fatal("could not save single validTestServer")
-	}
+	for i, s := range []*Server{
+		validTestServer1,
+		validTestServer2,
+	} {
+		if err := fs.add(s, n); err != nil {
+			t.Fatalf("could not save server #%v", i)
+		}
 
-	if err := fss.removeServer(validTestServer.Name, fakeServerPath); err != nil {
-		t.Fatal("could not remove first server: ", err)
+		ss := fs.GetAllServers()
+		if len(ss) != i+1 {
+			t.Log("iteration #", i)
+			t.Log("length of file store: ", len(ss))
+			t.Fatalf("number of servers should equal %v, is %v", i+1, len(ss))
+		}
+		if !reflect.DeepEqual(*s, *ss[i]) {
+			t.Logf("saved server: %+v\n", *s)
+			t.Logf("retrieved server: %+v\n", *ss[i])
+			t.Fatal("saved server is not equal to retrieved server")
+		}
 	}
+}
 
-	actual, err := ioutil.ReadFile(fakeServerPath)
+func TestGetServerByName(t *testing.T) {
+	n := getTestFileStoreName(t)
+	fs, err := newFileStore(n)
 	if err != nil {
-		t.Fatal("could not open written JSON file: ", err)
+		t.Fatal("unable to instantiate new file server store: ", err)
 	}
 
-	tActual := cutWhiteSpace(actual, t)
-	t.Logf("tActual: %v\n", string(tActual))
+	if err := fs.add(validTestServer1, n); err != nil {
+		t.Fatal("could not save single validTestServer1")
+	}
 
-	goldenFile := parseGoldenFile(t).Bytes()
-
-	// validate saved JSON is correct
-	if bytes.Compare(goldenFile, tActual) != 0 {
-		t.Fatal("written JSON file does not match golden file")
+	for _, s := range []struct {
+		name string
+		err  error
+	}{
+		{
+			validTestServer1.Name,
+			nil,
+		}, {
+			"name_does_not_exist",
+			ErrServerNotFound,
+		}, {
+			"",
+			ErrServerNotFound,
+		},
+	} {
+		if _, err := fs.GetServerByName(s.name); err != s.err {
+			t.Fatalf("expected error response for name %s to be %s, was %s",
+				s.name, err, s.err)
+		}
 	}
 }
